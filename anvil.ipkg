@@ -1,0 +1,5 @@
+package anvil
+
+sourcedir = src
+executable = anvil
+main = anvil
