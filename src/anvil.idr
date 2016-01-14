@@ -1,6 +1,6 @@
 module Main
 
-data Version :  Type where
+data Version : Type where
   V : (major : Nat) -> (minor : Nat) -> (patch : Nat) -> Version
 
 instance Eq Version where
@@ -15,8 +15,23 @@ instance Ord Version where
 instance Show Version where
   show (V a b c) = "version " ++ show a ++ "." ++ show b ++ "." ++ show c
 
+data PkgConstraint : Type where
+  Any     : PkgConstraint
+  Up      : Version -> PkgConstraint
+  Down    : Version -> PkgConstraint
+  Between : Version -> Version -> PkgConstraint
+
+instance Show PkgConstraint where
+  show Any           = ""
+  show (Up v)        = "(>= " ++ show v ++ ")"
+  show (Down v)      = "(<= " ++ show v ++ ")"
+  show (Between v w) = "(>= " ++ show v ++ ", <=" ++ show w ++ ")"
+
 data Pkg : Type where
-  Package : String -> Version -> List Pkg -> Pkg
+  Package : String -> Version -> List Pkg -> Pkg -- Change to List Dep
+
+data Dep : Type where
+  Dependency : String -> PkgConstraint -> List Dep -> Dep
 
 data InstallResult = Installed (List Pkg)
                    | NotReady
@@ -25,6 +40,13 @@ data InstallResult = Installed (List Pkg)
 installable : Pkg -> Bool
 installable (Package _ _ []) = True
 installable (Package _ _ xs) = False
+
+installable' : Pkg -> PkgConstraint -> Bool
+installable' (Package _ _ []) Any = True
+installable' (Package _ v []) (Up w) = v >= w
+installable' (Package _ v []) (Down w) = v <= w
+installable' (Package _ v []) (Between w x) = w <= v && v <= x
+installable' (Package _ _ xs) _ = False
 
 instance Eq Pkg where
   (Package s v _) == (Package s' v' _) = s == s' && v == v'
@@ -56,8 +78,7 @@ prepare : Pkg -> List Pkg -> IO InstallResult
 prepare (Package s v [])      pkgs = if (Package s v []) `elem` pkgs then return $ Installed pkgs
                                      else handle (install $ Package s v []) $ (Package s v []) :: pkgs
 prepare (Package s v $ x::xs) pkgs = if x `elem` pkgs then prepare (Package s v xs) pkgs
-                                     else do result <- prepare x pkgs
-                                             case result of
+                                     else do case !(prepare x pkgs) of
                                                Installed pkgs' => prepare (Package s v xs) pkgs'
                                                Error msg       => return $ Error msg
                                                NotReady        => prepare (Package s v $ xs ++ [x]) pkgs
@@ -75,8 +96,7 @@ main = do let packages = []
                     , C
                     ]
           let A = Package "A" (V 1 2 3) [B, C, D]
-          result <- prepare A packages
-          case result of
+          case !(prepare A packages) of
             Installed pkgs => putStrLn $ "Successfully installed packages:" ++ show pkgs ++ "."
             Error msg      => putStrLn $ "Encountered error: '" ++ msg ++ "' while installing packages."
             NotReady       => putStrLn $ "Could not complete the request at this time. Packages may be broken."
