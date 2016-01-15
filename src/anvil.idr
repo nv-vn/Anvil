@@ -101,12 +101,12 @@ prepare (Dependency s c $ x::xs) pkgs srcs = case queryPkg' x srcs of
 
 main : IO ()
 main = do let packages = [] -- Represents installed packages on system
-          let H = Dependency "H" (Exactly $ V 3 5 1) []
-          let D = Dependency "D" (Exactly $ V 1 6 7)
+          let H = Dependency "H" (Up $ V 3 5 0) []
+          let D = Dependency "D" (Down $ V 1 7 0)
                     [ Dependency "F" (Exactly $ V 2 4 0) [H]
-                    , Dependency "G" (Exactly $ V 0 3 7) [H]
+                    , Dependency "G" (Between (V 0 0 0)  (V 1 0 0)) [H]
                     ]
-          let C = Dependency "C" (Exactly $ V 2 4 3) [D]
+          let C = Dependency "C" Any [D]
           let B = Dependency "B" (Exactly $ V 1 4 1)
                     [ Dependency "E" (Exactly $ V 3 2 1) []
                     , C
