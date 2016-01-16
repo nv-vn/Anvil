@@ -70,17 +70,17 @@ instance Show Pkg where
 
 queryPkg : String -> PkgConstraint -> List Pkg -> Maybe Pkg
 queryPkg name constraint srcs = head' matches
-  where matches = filter (\(Package n v _) => n == name && inRange v constraint) srcs
+  where matches = filter (\(Package n v _) => n == name && inRange v constraint) $ reverse $ sort srcs -- This is slow, will bottleneck
 
 --| TODO: Require that the Pkg be proven to be in the range of a PkgConstraint
-install : (p : Pkg) -> {auto q : installable p = True} -> Either (IO ()) String
-install (Package s v []) = Left $ do putStrLn $ "Cloning package " ++ s
-                                     putStrLn $ "Compiling package " ++ s
-                                     putStrLn $ "Installing package " ++ s
+install : (p : Pkg) -> {auto q : installable p = True} -> Either String (IO ())
+install (Package s v []) = Right $ do putStrLn $ "Cloning package " ++ s
+                                      putStrLn $ "Compiling package " ++ s
+                                      putStrLn $ "Installing package " ++ s
 
-handle : Either (IO ()) String -> List Pkg -> IO InstallResult
-handle (Right msg) pkgs = return $ Error msg
-handle (Left eff)  pkgs = do eff
+handle : Either String (IO ()) -> List Pkg -> IO InstallResult
+handle (Left msg)  pkgs = return $ Error msg
+handle (Right eff) pkgs = do eff
                              putStrLn "Done."
                              return $ Installed pkgs
 
@@ -113,6 +113,7 @@ main = do let packages = [] -- Represents installed packages on system
                     ]
           let A = Dependency "A" (Exactly $ V 1 2 3) [B, C, D]
           let sources = [Package "H" (V 3 5 1) [], -- Represents database of available packages
+                         Package "H" (V 3 5 0) [],
                          Package "D" (V 1 6 7) [],
                          Package "F" (V 2 4 0) [],
                          Package "G" (V 0 3 7) [],
