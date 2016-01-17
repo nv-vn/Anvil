@@ -2,4 +2,5 @@ package anvil
 
 sourcedir = src
 executable = anvil
-main = anvil
+main = Anvil
+opts = "-p effects -p lightyear"
