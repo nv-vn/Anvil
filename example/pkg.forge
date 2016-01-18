@@ -1,16 +1,17 @@
 (pkg
   (name "Pkg")
   (description "An example package, for use with Anvil.")
+  (license "GPL")
   (homepage "http://github.com/nv-vn/Anvil")
   (issues "http://github.com/nv-vn/Anvil")
-  (authors "nv")
+  (maintainer "nv")
   (contributors "nv")
+  (compile "make")
+  (install "sudo make install")
   (candidates
     (v "1.0.0"
       (depends
         (* "gcc")
         (> "1.4.1" "my-other-package"))
       (src "http://github.com/nv-vn/Anvil/blob/master/example/src/")
-      (hash "ignore for now")
-      (compile "make")
-      (install-sudo "make install"))))
+      (hash "ignore for now"))))

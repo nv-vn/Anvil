@@ -55,12 +55,33 @@ join (Right (Right b)) = Right b
 
 getData : Sexpr -> Either String PackageMeta
 getData sexpr = do root <- find "pkg" sexpr
-                   return (Meta "a" "b" "c" "d" "e" "f" ["g"] [] "h" "i" "j")
+                   name <- extract !(find "name" root)
+                   desc <- extract !(find "description" root)
+                   license <- extract !(find "license" root)
+                   homepage <- extract !(find "homepage" root)
+                   issues <- extract !(find "issues" root)
+                   maintainer <- extract !(find "maintainer" root)
+                   contributors <- extractl !(find "contributors" root)
+                   candidates <- find "candidates" root -- Finish building this tree...
+                   compile <- extract !(find "compile" root) <|> return "./configure && make"
+                   install <- extract !(find "install" root) <|> return "sudo make install"
+                   uninstall <- extract !(find "uninstall" root) <|> return "sudo make uninstall"
+                   return (Meta name desc license homepage issues maintainer contributors [] compile install uninstall)
   where find : String -> Sexpr -> Either String Sexpr
         find q (ExpList $ (Literal x)::xs) = if x == q then
                                                return $ ExpList $ (Literal x)::xs
                                              else choice $ map (find q) xs
         find _ _                           = Left "Error in package definition"
+
+        extract : Sexpr -> Either String String
+        extract (Literal s) = return s
+        extract (Ident s)   = return s
+        extract (ExpList _) = Left "Error in package definition"
+
+        extractl : Sexpr -> Either String (List String)
+        extractl (ExpList [])      = return []
+        extractl (ExpList $ x::xs) = do return $ !(extract x) :: !(extractl $ ExpList xs)
+        extractl _                 = Left "Error in package definition"
 
 parseMeta : Parser (Either String PackageMeta)
 parseMeta = do tree <- sexpr
