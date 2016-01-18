@@ -1,5 +1,8 @@
 module Main
 
+import Effects
+import Effect.File
+
 import Package
 import PackageFormat
 
@@ -64,3 +67,5 @@ main = do let packages = [] -- Represents installed packages on system
             Installed pkgs => putStrLn $ "Successfully installed packages:" ++ show pkgs ++ "."
             Error msg      => putStrLn $ "Encountered error: '" ++ msg ++ "' while installing packages."
             NotReady       => putStrLn $ "Could not complete the request at this time. Packages may be broken."
+          x <- run $ readPackage "pkg"
+          putStrLn $ show x
