@@ -16,7 +16,6 @@ record PackageMeta where
   name, description, license, homepage, issues, maintainer : String
   contributors : List String
   installCandidates : List Pkg
-  build, install, uninstall : String -- Maybe custom datatype for commands? Or should we have dedicated install scripts?
 
 instance Show PackageMeta where
   show pkg = "\n " ++ unwords
@@ -28,9 +27,6 @@ instance Show PackageMeta where
              , "Maintainer: " ++ maintainer pkg ++ "\n"
              , "Contributors: " ++ (show $ contributors pkg) ++ "\n"
              , "Install Candidates: " ++ (show $ installCandidates pkg) ++ "\n"
-             , "Build Command: `" ++ build pkg ++ "`\n"
-             , "Install Command: `" ++ install pkg ++ "`\n"
-             , "Uninstall Command: `" ++ uninstall pkg ++ "`\n"
              ]
 
 data Sexpr = Ident   String   -- Should we add dotted pairs?
@@ -74,6 +70,44 @@ join (Left a)          = Left a
 join (Right (Left a))  = Left a
 join (Right (Right b)) = Right b
 
+find : String -> Sexpr -> Either String Sexpr
+find q (ExpList $ (Ident x)::xs) = if x == q then
+                                     return $ ExpList $ (Ident x)::xs
+                                   else choice $ map (find q) xs
+find q s                         = Left $ "Error in package definition/find " ++ q ++ " for " ++ show s
+
+extract : Sexpr -> Either String String
+extract (ExpList $ _::(Literal s)::_) = return s
+extract (ExpList $ _::(Ident s)::_)   = return s
+extract (ExpList _)                   = Left "Error in package definition/extract"
+
+extractl : Sexpr -> Either String (List String)
+extractl (ExpList [])      = return []
+extractl (ExpList $ (Literal x)::xs) = do return $ x :: !(extractl $ ExpList xs)
+extractl (ExpList $ (Ident x)::xs)   = do extractl $ ExpList xs
+extractl _                           = Left "Error in package definition/extractl"
+
+getCandidates : String -> List Sexpr -> Either String (List Pkg)
+getCandidates name []      = return []
+getCandidates name (x::xs) = do case parseCandidate x of
+                                  Left e  => Left e
+                                  Right p => return $ p :: !(getCandidates name xs)
+  where parseCandidate : Sexpr -> Either String Pkg
+        parseCandidate sexpr = do root <- find "v" sexpr
+                                  version <- extract root -- Finish parsing the version number...
+                                  deps <- find "depends" root -- Finish building this tree...
+                                  src <- extract !(find "src" root)
+                                  hash <- extractHash !(find "hash" root <|> find "hash-sha1" root <|> find "hash-md5" root <|> (Right $ ExpList []))
+                                  compile <- extract !(find "compile" root <|> (Right $ ExpList [])) <|> return "./configure && make"
+                                  install <- extract !(find "install" root <|> (Right $ ExpList [])) <|> return "sudo make install"
+                                  uninstall <- extract !(find "uninstall" root <|> (Right $ ExpList [])) <|> return "sudo make uninstall"
+                                  return $ Package name (V 1 0 0) compile install uninstall src hash []
+    where extractHash : Sexpr -> Either String Hash
+          extractHash (ExpList [Ident "hash",      Literal h]) = return $ Blake2 h
+          extractHash (ExpList [Ident "hash-md5",  Literal h]) = return $ Md5 h
+          extractHash (ExpList [Ident "hash-sha1", Literal h]) = return $ Sha1 h
+          extractHash _                                        = return None
+
 getData : Sexpr -> Either String PackageMeta
 getData sexpr = do root <- find "pkg" sexpr
                    name <- extract !(find "name" root)
@@ -82,27 +116,11 @@ getData sexpr = do root <- find "pkg" sexpr
                    homepage <- extract !(find "homepage" root)
                    issues <- extract !(find "issues" root)
                    maintainer <- extract !(find "maintainer" root)
-                   --contributors <- extractl !(find "contributors" root)
-                   candidates <- find "candidates" root -- Finish building this tree...
-                   compile <- extract !(find "compile" root <|> (Right $ ExpList [])) <|> return "./configure && make"
-                   install <- extract !(find "install" root <|> (Right $ ExpList [])) <|> return "sudo make install"
-                   uninstall <- extract !(find "uninstall" root <|> (Right $ ExpList [])) <|> return "sudo make uninstall"
-                   return (Meta name desc license homepage issues maintainer [] [] compile install uninstall)
-  where find : String -> Sexpr -> Either String Sexpr
-        find q (ExpList $ (Ident x)::xs) = if x == q then
-                                             return $ ExpList $ (Ident x)::xs
-                                           else choice $ map (find q) xs
-        find q s                         = Left $ "Error in package definition/find " ++ q ++ " for " ++ show s
-
-        extract : Sexpr -> Either String String
-        extract (ExpList $ _::(Literal s)::_) = return s
-        extract (ExpList $ _::(Ident s)::_)   = return s
-        extract (ExpList _)                   = Left "Error in package definition/extract"
-
-        extractl : Sexpr -> Either String (List String)
-        extractl (ExpList [])      = return []
-        extractl (ExpList $ x::xs) = do return $ !(extract x) :: !(extractl $ ExpList xs)
-        extractl _                 = Left "Error in package definition/extractl"
+                   contributors <- extractl !(find "contributors" root)
+                   candidates <- getCandidates name $ case !(find "candidates" root) of
+                                                        ExpList (_::xs) => xs
+                                                        _               => []
+                   return (Meta name desc license homepage issues maintainer contributors candidates)
 
 parseMeta : Parser (Either String PackageMeta)
 parseMeta = do tree <- sexpr

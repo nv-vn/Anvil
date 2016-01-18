@@ -45,21 +45,32 @@ instance Show Dep where
 instance [verbose] Show Dep where
   show (Dependency s v xs) = "Package " ++ s ++ " " ++ show v ++ " depends on: " ++ show xs
 
-data Pkg : Type where
-  Package : String -> Version -> List Dep -> Pkg -- Should packages still store their dependencies?
+data Hash = None
+          | Md5 String
+          | Sha1 String
+          | Blake2 String
+
+record Pkg where
+  constructor Package
+  pname : String
+  version : Version
+  compile, install, uninstall : String
+  src : String
+  hash : Hash
+  deps : List Dep -- Should packages still store their dependencies?
 
 instance Eq Pkg where
-  (Package s v _) == (Package s' v' _) = s == s' && v == v'
+  p == p' = pname p == pname p' && version p == version p'
 
 instance Ord Pkg where
-  compare (Package s v _) (Package s' v' _) = if s > s' then GT else
-                                              if s < s' then LT else
-                                              if v > v' then GT else
-                                              if v < v' then LT else EQ
+  compare p p' = if pname p > pname p' then GT else
+                 if pname p < pname p' then LT else
+                 if version p > version p' then GT else
+                 if version p < version p' then LT else EQ
 
 instance Show Pkg where
-  show (Package s v xs) = "Package " ++ s ++ " " ++ show v
+  show p = "Package " ++ pname p ++ " " ++ (show $ version p)
 
 queryPkg : String -> PkgConstraint -> List Pkg -> Maybe Pkg
-queryPkg name constraint srcs = head' matches
-  where matches = filter (\(Package n v _) => n == name && inRange v constraint) $ reverse $ sort srcs -- This is slow, will bottleneck
+queryPkg query constraint srcs = head' matches
+  where matches = filter (\pkg => pname pkg == query && inRange (version pkg) constraint) $ reverse $ sort srcs -- This is slow, will bottleneck
