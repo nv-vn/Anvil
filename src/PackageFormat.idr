@@ -10,6 +10,10 @@ import Lightyear.Combinators
 import Lightyear.StringFile
 
 import Package
+import ConfigProvider
+
+%language TypeProviders
+%provide (defaultDir : String) with getPkgPath
 
 record PackageMeta where
   constructor Meta
@@ -58,6 +62,9 @@ instance Show Sexpr where
   show (Literal s)  = "\"" ++ s ++ "\""
   show (ExpList xs) = show xs
 
+parseVersion : Parser Version
+parseVersion = (\[x, y, z] => V (cast x) (cast y) (cast z)) <$> sepByN 3 integer (char '.')
+
 instance Alternative (Either String) where     -- Needed for us to use choice
   empty   = Left "Error in package definition/empty"
   a <|> b = case (a, b) of
@@ -94,14 +101,14 @@ getCandidates name (x::xs) = do case parseCandidate x of
                                   Right p => return $ p :: !(getCandidates name xs)
   where parseCandidate : Sexpr -> Either String Pkg
         parseCandidate sexpr = do root <- find "v" sexpr
-                                  version <- extract root -- Finish parsing the version number...
+                                  version <- parse parseVersion !(extract root) -- Finish parsing the version number...
                                   deps <- find "depends" root -- Finish building this tree...
                                   src <- extract !(find "src" root)
                                   hash <- extractHash !(find "hash" root <|> find "hash-sha1" root <|> find "hash-md5" root <|> (Right $ ExpList []))
                                   compile <- extract !(find "compile" root <|> (Right $ ExpList [])) <|> return "./configure && make"
                                   install <- extract !(find "install" root <|> (Right $ ExpList [])) <|> return "sudo make install"
                                   uninstall <- extract !(find "uninstall" root <|> (Right $ ExpList [])) <|> return "sudo make uninstall"
-                                  return $ Package name (V 1 0 0) compile install uninstall src hash []
+                                  return $ Package name version compile install uninstall src hash []
     where extractHash : Sexpr -> Either String Hash
           extractHash (ExpList [Ident "hash",      Literal h]) = return $ Blake2 h
           extractHash (ExpList [Ident "hash-md5",  Literal h]) = return $ Md5 h
@@ -125,9 +132,6 @@ getData sexpr = do root <- find "pkg" sexpr
 parseMeta : Parser (Either String PackageMeta)
 parseMeta = do tree <- sexpr
                return $ getData tree
-
-defaultDir : String
-defaultDir = "./example/" -- Should get this from a type provider?
 
 readPackage : String -> Eff (Either String PackageMeta) [FILE_IO ()]
 readPackage name = do meta <- readFile (\err => "Couldn't find package: " ++ name) (defaultDir ++ "db/" ++ name ++ ".forge")
