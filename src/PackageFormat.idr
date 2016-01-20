@@ -13,7 +13,11 @@ import Package
 import ConfigProvider
 
 %language TypeProviders
-%provide (defaultDir : String) with getPkgPath
+-- Disabled to stop compiler from hanging on this file
+--%provide (defaultDir : String) with getPkgPath
+
+defaultDir : String
+defaultDir = "./example"
 
 record PackageMeta where
   constructor Meta

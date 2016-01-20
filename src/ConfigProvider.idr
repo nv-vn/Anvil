@@ -1,11 +1,12 @@
 module ConfigProvider
 
-import Effects
-import Effect.File
-
 import Lightyear
 import Lightyear.Char
 import Lightyear.Strings
+import Lightyear.StringFile
+
+import Prelude.Providers
+%language TypeProviders
 
 record Field where
   constructor MkField
@@ -20,14 +21,24 @@ parseFields = many parseField
                         many newline
                         return $ MkField (pack name) val
 
-getConfig : Eff (Either String $ List Field) [FILE_IO ()]
-getConfig = do file <- readFile (\err => "Couldn't read config! Using defaults.") "../config.cfg"
-               return $ file >>= parse parseFields
+getConfig : IO (Either String $ List Field)
+getConfig = do Right file <- readFile "../config.cfg"
+                     | Left err => return (Left "Couldn't read config file, using defaults!")
+               return $ parse parseFields file
+
+getConfigField : String -> String -> IO (Provider String)
+getConfigField field d = do case !getConfig of
+                              Left err  => do putStrLn $ show err
+                                              return $ pure d
+                              Right cfg => case filter (\i => fname i == field) cfg of
+                                             []   => return $ pure d
+                                             x::_ => return $ pure $ fvalue x
 
 getPkgPath : IO (Provider String)
-getPkgPath = do case !(run getConfig) of
-                  Left err  => do putStrLn err
-                                  return $ Provide "./example/"
-                  Right cfg => case filter (\i => fname i == "defaultPkgPath") cfg of
-                                 []   => return $ Provide "./example/"
-                                 x::_ => return $ Provide $ fvalue x
+getPkgPath = getConfigField "defaultPkgPath" "./example/"
+
+getPrimarySrc : IO (Provider String)
+getPrimarySrc = getConfigField "primarySources" "db/"
+
+getOverlays : IO (Provider String)
+getOverlays = getConfigField "overlays" ".overlays"
