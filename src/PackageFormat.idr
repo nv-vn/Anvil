@@ -17,7 +17,7 @@ import ConfigProvider
 --%provide (defaultDir : String) with getPkgPath
 
 defaultDir : String
-defaultDir = "./example"
+defaultDir = "./example/"
 
 record PackageMeta where
   constructor Meta
@@ -25,7 +25,7 @@ record PackageMeta where
   contributors : List String
   installCandidates : List Pkg
 
-instance Show PackageMeta where
+Show PackageMeta where
   show pkg = "\n " ++ unwords
              [ "Name: " ++ name pkg ++ "\n"
              , "Description: " ++ description pkg ++ "\n"
@@ -61,7 +61,7 @@ mutual
   sexpr : Parser Sexpr
   sexpr = spacedOut ident <|> spacedOut literal <|> spacedOut explist
 
-instance Show Sexpr where
+Show Sexpr where
   show (Ident s)    = s
   show (Literal s)  = "\"" ++ s ++ "\""
   show (ExpList xs) = show xs
@@ -69,7 +69,7 @@ instance Show Sexpr where
 parseVersion : Parser Version
 parseVersion = (\[x, y, z] => V (cast x) (cast y) (cast z)) <$> sepByN 3 integer (char '.')
 
-instance Alternative (Either String) where     -- Needed for us to use choice
+Alternative (Either String) where     -- Needed for us to use choice
   empty   = Left "Error in package definition/empty"
   a <|> b = case (a, b) of
               (Right a,      _) => Right a

@@ -39,10 +39,10 @@ inRange v (Between w x) = w <= v && v <= x
 data Dep : Type where
   Dependency : String -> PkgConstraint -> List Dep -> Dep
 
-instance Show Dep where
+Show Dep where
   show (Dependency s v xs) = "Package " ++ s ++ " " ++ show v
 
-instance [verbose] Show Dep where
+[verbose] Show Dep where
   show (Dependency s v xs) = "Package " ++ s ++ " " ++ show v ++ " depends on: " ++ show xs
 
 data Hash = None
@@ -59,16 +59,16 @@ record Pkg where
   hash : Hash
   deps : List Dep -- Should packages still store their dependencies?
 
-instance Eq Pkg where
+Eq Pkg where
   p == p' = pname p == pname p' && version p == version p'
 
-instance Ord Pkg where
+Ord Pkg where
   compare p p' = if pname p > pname p' then GT else
                  if pname p < pname p' then LT else
                  if version p > version p' then GT else
                  if version p < version p' then LT else EQ
 
-instance Show Pkg where
+Show Pkg where
   show p = "Package " ++ pname p ++ " " ++ (show $ version p)
 
 queryPkg : String -> PkgConstraint -> List Pkg -> Maybe Pkg

@@ -11,7 +11,7 @@ data InstallResult = Installed (List Pkg)
                    | Error String
 
 installable : Pkg -> Bool
-installable pkg = (length $ deps pkg) == 0 -- Make an instance for Eq (List Dep) to speed this up!
+installable pkg = (length $ deps pkg) == 0 -- Make an implementation for Eq (List Dep) to speed this up!
 
 --| TODO: Require that the Pkg be proven to be in the range of a PkgConstraint
 install : (p : Pkg) -> Either String (IO ())
