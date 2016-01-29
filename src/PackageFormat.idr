@@ -34,8 +34,10 @@ Show PackageMeta where
              , "Issues: " ++ issues pkg ++ "\n"
              , "Maintainer: " ++ maintainer pkg ++ "\n"
              , "Contributors: " ++ (show $ contributors pkg) ++ "\n"
-             , "Install Candidates: " ++ (show $ installCandidates pkg) ++ "\n"
+             , "Install Candidates: " ++ (show' $ installCandidates pkg) ++ "\n"
              ]
+  where show' : List Pkg -> String
+        show' pkgs = show $ map (show @{pkgverbose}) pkgs
 
 data Sexpr = Ident   String   -- Should we add dotted pairs?
            | Literal String
@@ -98,6 +100,24 @@ extractl (ExpList $ (Literal x)::xs) = do return $ x :: !(extractl $ ExpList xs)
 extractl (ExpList $ (Ident x)::xs)   = do extractl $ ExpList xs
 extractl _                           = Left "Error in package definition/extractl"
 
+getDependency : Sexpr -> Dep
+getDependency sexpr = case sexpr of
+                        ExpList [Ident "*", name]                => Dependency (read name) Any []
+                        ExpList [Ident "=", version, name]       => Dependency (read name) (Exactly $ readv version) []
+                        ExpList [Ident ">", lower, name]         => Dependency (read name) (Up $ readv lower) []
+                        ExpList [Ident "<", upper, name]         => Dependency (read name) (Down $ readv upper) []
+                        ExpList [Ident "><", lower, upper, name] => Dependency (read name) (Between (readv lower) (readv upper)) []
+                        _                                        => Dependency "Error" Any []
+  where read : Sexpr -> String
+        read (Ident i)        = i
+        read (Literal s)      = s
+        read (ExpList (x::_)) = read x
+
+        readv : Sexpr -> Version
+        readv vstr = case parse parseVersion $ read vstr of
+                       Left _  => V 1 0 0
+                       Right v => v
+
 getCandidates : String -> List Sexpr -> Either String (List Pkg)
 getCandidates name []      = return []
 getCandidates name (x::xs) = do case parseCandidate x of
@@ -105,8 +125,10 @@ getCandidates name (x::xs) = do case parseCandidate x of
                                   Right p => return $ p :: !(getCandidates name xs)
   where parseCandidate : Sexpr -> Either String Pkg
         parseCandidate sexpr = do root <- find "v" sexpr
-                                  version <- parse parseVersion !(extract root) -- Finish parsing the version number...
-                                  deps <- find "depends" root -- Finish building this tree...
+                                  version <- parse parseVersion !(extract root)
+                                  ExpList (_::depsroot) <- find "depends" root
+                                    | sexpr => Left ("Error while reading dependencies of a package file: " ++ show sexpr)
+                                  deps <- return $ map getDependency depsroot -- Finish building this tree...
                                   src <- extract !(find "src" root)
                                   hash <- extractHash !(find "hash" root <|> find "hash-sha1" root <|> find "hash-md5" root <|> (Right $ ExpList []))
                                   compile <- extract !(find "compile" root <|> (Right $ ExpList [])) <|> return "./configure && make"

@@ -3,16 +3,16 @@ module Package
 data Version : Type where
   V : (major : Nat) -> (minor : Nat) -> (patch : Nat) -> Version
 
-instance Eq Version where
+Eq Version where
   (V a b c) == (V a' b' c') = (a == a') && (b == b') && (c == c')
 
-instance Ord Version where
+Ord Version where
   compare (V a b c) (V a' b' c') = if a > a' then GT else
                                    if a == a' && b > b' then GT else
                                    if a == a' && b == b' && c > c' then GT else
                                    if a == a' && b == b' && c == c' then EQ else LT
 
-instance Show Version where
+Show Version where
   show (V a b c) = "version " ++ show a ++ "." ++ show b ++ "." ++ show c
 
 data PkgConstraint : Type where
@@ -22,7 +22,7 @@ data PkgConstraint : Type where
   Exactly : Version -> PkgConstraint
   Between : Version -> Version -> PkgConstraint
 
-instance Show PkgConstraint where
+Show PkgConstraint where
   show Any           = ""
   show (Up v)        = "(>= " ++ show v ++ ")"
   show (Down v)      = "(<= " ++ show v ++ ")"
@@ -42,7 +42,7 @@ data Dep : Type where
 Show Dep where
   show (Dependency s v xs) = "Package " ++ s ++ " " ++ show v
 
-[verbose] Show Dep where
+[depverbose] Show Dep where
   show (Dependency s v xs) = "Package " ++ s ++ " " ++ show v ++ " depends on: " ++ show xs
 
 data Hash = None
@@ -70,6 +70,9 @@ Ord Pkg where
 
 Show Pkg where
   show p = "Package " ++ pname p ++ " " ++ (show $ version p)
+
+[pkgverbose] Show Pkg where
+  show p = "Package " ++ pname p ++ " " ++ (show $ version p) ++ " depends on: " ++ show (deps p)
 
 queryPkg : String -> PkgConstraint -> List Pkg -> Maybe Pkg
 queryPkg query constraint srcs = head' matches
