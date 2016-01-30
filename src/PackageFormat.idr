@@ -39,7 +39,7 @@ Show PackageMeta where
   where show' : List Pkg -> String
         show' pkgs = show $ map (show @{pkgverbose}) pkgs
 
-data Sexpr = Ident   String   -- Should we add dotted pairs?
+data Sexpr = Ident   String
            | Literal String
            | ExpList (List Sexpr)
 
@@ -134,7 +134,7 @@ getCandidates name (x::xs) = do case parseCandidate x of
                                   compile <- extract !(find "compile" root <|> (Right $ ExpList [])) <|> return "./configure && make"
                                   install <- extract !(find "install" root <|> (Right $ ExpList [])) <|> return "sudo make install"
                                   uninstall <- extract !(find "uninstall" root <|> (Right $ ExpList [])) <|> return "sudo make uninstall"
-                                  return $ Package name version compile install uninstall src hash []
+                                  return $ Package name version compile install uninstall src hash deps
     where extractHash : Sexpr -> Either String Hash
           extractHash (ExpList [Ident "hash",      Literal h]) = return $ Blake2 h
           extractHash (ExpList [Ident "hash-md5",  Literal h]) = return $ Md5 h
